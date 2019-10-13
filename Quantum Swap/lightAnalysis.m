@@ -73,6 +73,15 @@ end
 % Save output values in .mat file
 save(folderName + '.mat', 'outputIntensity', 'outputDifference', 'bestRadius', 'xCoord', 'yCoord');
 
+% Calculate gamma 
+for i = 1 : countFiles
+	gamma(i) = abs(outputIntensity(1,i) - outputIntensity(2,i)) / (outputIntensity(1,i) + outputIntensity(2,i));
+end
+
+figure()
+xX = 0 : (1 / (countFiles - 1)) : 1;
+plot(xX, gamma)
+
 % / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
 
 % Given a file, open it in the current folder and convert it to an
