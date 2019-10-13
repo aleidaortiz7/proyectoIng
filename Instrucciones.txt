@@ -1,0 +1,24 @@
+- - - #1 Pasos iniciales
+
+1. Picarle al icono de Windows
+
+2. Buscar "cmd" y abrir "Command Prompt"
+
+3. Copiar y pegar lo siguiente: 
+cd Desktop/proyectoIng
+
+
+
+- - - #2 Descargar cambios actualizados (Se necesita #1)
+
+1. git pull origin
+
+
+
+- - - #3 Subir cambios a Github (Se necesita #1)
+
+1. git add .
+
+2. git commit -m "Cambiar esto por mensaje corto de los cambios, dejar comillas de los lados"
+
+3. git push
