@@ -6,7 +6,7 @@ clear all;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAMETROS
-imagenLeer = "mSimetrica.png";
+imagenLeer = "triangulo.png";
 
 maxA = 10;
 maxB = 10;
@@ -16,8 +16,8 @@ for a = 1 : maxA
 descartado = 0;
         
 % Limites inferiores y superiores para los ejes 'x' y 'y'
-xLimInf = 0;
-xLimSup = a;
+xLimInf = - a / 2;
+xLimSup = a / 2;
 yLimInf = 0;
 yLimSup = b;
 
@@ -172,7 +172,7 @@ for it = 1 : numeroIteraciones
             disp('No es un soliton, cancelando propagacion');
             
             plot(xLinSpace, matCapas(:, it));
-            xlim([0 maxA]);
+            xlim([(-maxA / 2) (maxA / 2)]);
             ylim([0 maxB]);
             
             nombreImg = ['DESCARTADO_a_', num2str(a),'_b_', num2str(b), '.png'];
@@ -189,7 +189,7 @@ end
 
 if descartado == 0
     plot(xLinSpace, matCapas(:, 1));
-    xlim([0 maxA]);
+    xlim([(-maxA / 2) (maxA / 2)]);
     ylim([0 maxB]);
     
     nombreImg = ['CONFIRMADO_a_', num2str(a),'_b_', num2str(b), '.png'];

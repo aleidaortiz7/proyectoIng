@@ -9,10 +9,10 @@ clear all;
 imagenLeer = "mSimetrica.png";
 
 % Limites inferiores y superiores para los ejes 'x' y 'y'
-xLimInf = -15;
-xLimSup = 15;
+xLimInf = -0.5;
+xLimSup = 0.5;
 yLimInf = 0;
-yLimSup = 3.0;
+yLimSup = 1.0;
 
 % Cantidad de puntos
 N = 1000;
@@ -114,7 +114,7 @@ save matPotencialSoliton.mat matPotencialSoliton;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PARAMETROS
-numeroIteraciones = 5000;
+numeroIteraciones = 500;
 stepRevisarPropagacion = 25;
 
 zPropagar = 10;
@@ -145,10 +145,7 @@ V = lambda - abs(U) .^ 2 - (1 / 2) * ifft((1i)^2 * kF.* fft(U)) ./ (U + 1e-9);
 matCapas = zeros(N, numeroIteraciones);
 errorPromedioPerfiles = 0;
 
-for it = 1 : numeroIteraciones
-    textoIt = ['Iteracion: ', num2str(it),' de ', num2str(numeroIteraciones)];
-    disp(textoIt)
-    
+for it = 1 : numeroIteraciones    
     % Transformada de Fourier
     % Transformada de Fourier por la exp(-i k^2 deltaZ)
     %Transformada inversa de Fourier
@@ -186,7 +183,8 @@ load matSolitonGenerado.mat matCapas;
 % Encontrar maximos valores
 maxAll = max(matCapas, [], 'all');
 
-% Graficar cada una de las capasfor i = 1 : 500
+% Graficar cada una de las capas
+for i = 1 : numeroIteraciones
     figure(2);
     plot(xLinSpace, matCapas(:, i));
     ylim([0 maxAll]);
