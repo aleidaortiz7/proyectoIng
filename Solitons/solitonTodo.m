@@ -11,9 +11,9 @@ mostrarImagen = 1;
 guardarImagen = 0;
 mostrarAnimacion = 0;
 
-maxAnchura = 1:10;
-maxAltura = 1:10;
-zConjuntoPropagar = [10 25 100];
+maxAnchura = 0.1:0.1:0.5;
+maxAltura = 0.1:0.1:0.5;
+zConjuntoPropagar = (1:5);
 
 % Cantidad de puntos
 N = 500;
@@ -21,7 +21,7 @@ N = 500;
 % Porcentajes de limpieza y curva de decaimiento. Es decir, 
 % cuantos porcentaje de pixeles se toman de cada extremo para
 % limpiar y para generar una curva de decaimiento.
-porcentajeCurvaDecaimiento = 0.05;
+porcentajeCurvaDecaimiento = 0.025;
     
 %% PARAMETROS PARTICULARES (GENERACION DE SOLO UN CASO)
 anchuraParticular = [10];
@@ -163,9 +163,12 @@ for zPropagar = zConjuntoPropagar
             lambda = ones(1, N);
             V = lambda - abs(U) .^ 2 - (1 / 2) * ifft((1i)^2 * kF.* fft(U)) ./ (U + 1e-9);
                    
-            errorPromedioPerfiles = 0;
-            matCapas = zeros(N, numeroIteraciones);
+            matCapas = zeros(N, 100);
             numCapa = 1;
+            capaActual = zeros(N, 1);
+            capaAnterior = zeros(N, 1);  
+            
+            errorPromedioPerfiles = 0;
             
             for it = 1 : numeroIteraciones    
                 % Transformada de Fourier
@@ -177,22 +180,34 @@ for zPropagar = zConjuntoPropagar
             
                 % Calcular funcion phi y almacenar el resultado
                 U = exp(1i .* dz / 2 .* (abs(TFExpInv) .^ 2 + V)) .* TFExpInv;
-                matCapas(:, it) = abs(U);
-            
+                
+                if it == 1
+                    capaAnterior = abs(U);
+                end
+                
                 % Cada ciertas iteraciones, revisar el error entre la iteracion actual
                 % y una previa. Si es mucho el error, quiere decir que no es soliton
                 if mod(it, stepRevisarPropagacion) == 0
                                       
-                    capaActual = sum(matCapas(:, it));
-                    capaAnterior = sum(matCapas(:, it - stepRevisarPropagacion + 1));                 
-                    errorPromedioPerfiles = abs(1 - (capaActual / capaAnterior));
-                 
+                    matCapas(:, numCapa) = abs(U);
+                    capaActual = matCapas(:, numCapa);
+                                   
+                    sumCapaAnterior = sum(capaAnterior);
+                    sumCapaActual = sum(capaActual);
+                    errorPromedioPerfiles = abs(1 - (sumCapaAnterior / sumCapaActual));
+                              
                     % En el caso de que no se quiera propagar siempre y que haya mucho
                     % error, se cancela la operacion
-                    if  (errorPromedioPerfiles > 0.1)
+                    if  (errorPromedioPerfiles > 0.15)
                         solitonDescartado = 1;
-                        it = numeroIteraciones;
-                    end     
+                        
+                        if siemprePropagar == 0
+                            it = numeroIteraciones;
+                        end                   
+                    end
+                    
+                    capaAnterior = capaActual;
+                    numCapa = numCapa + 1;
                                                                   
                 end % Termina step de revision
                 
@@ -207,14 +222,16 @@ for zPropagar = zConjuntoPropagar
                     colorPlot = 'Red';
                 end
                  
+                % PLOT SOLITON
                 figure(2);  
                 plot(xPos, yPosMinExt, 'Color', colorPlot);
                 xlim([(-maxAnchura(end) / 2) (maxAnchura(end) / 2)]);
                 ylim([0 maxAltura(end)]);
                 etiqueta = ['a = ', num2str(anchura), ' b = ', num2str(altura), ' z = ', num2str(zPropagar)];
-                title(etiqueta);
-                            
+                title(etiqueta);      
                 hold on;
+                
+                % PLOT MALLA
                              
                 if guardarImagen == 1
                     saveas(gcf, nombreImg);  
