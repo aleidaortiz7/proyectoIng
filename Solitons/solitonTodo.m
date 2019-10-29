@@ -1,58 +1,51 @@
 clc;
 close all;
 clear all;
+
+%% PARAMETROS CODIGO
 imagenLeer = "mSimetrica.png";
+siemprePropagar = 0;
 
-%% PARAMETROS GENERALES (GENERACION DE TODOS LOS CASOS)
-generacionAutomatica = 1;
-siemprePropagar = 1;
 
-mostrarImagen = 1;
-guardarImagen = 0;
-mostrarAnimacion = 0;
+mostrarSoliton = 0;
+guardarImagenSoliton = 0;
+mostrarAnimacionSoliton = 0;
 
-maxAnchura = 0.1:0.1:0.5;
-maxAltura = 0.1:0.1:0.5;
-zConjuntoPropagar = (1:5);
+guardarImagenMalla = 1;
 
 % Cantidad de puntos
-N = 500;
+N = 1000;
+vecAnch = [0.1:0.1:0.6];
+vecAlt = [0.1:0.1:0.6];
+zConjuntoPropagar = [5];
 
 % Porcentajes de limpieza y curva de decaimiento. Es decir, 
 % cuantos porcentaje de pixeles se toman de cada extremo para
 % limpiar y para generar una curva de decaimiento.
-porcentajeCurvaDecaimiento = 0.025;
-    
-%% PARAMETROS PARTICULARES (GENERACION DE SOLO UN CASO)
-anchuraParticular = [10];
-alturaParticular = [10];
-zParticular = [10];
-
-if generacionAutomatica == 0
-    maxAnchura = anchuraParticular;
-    maxAltura = alturaParticular;
-    zConjuntoPropagar = zParticular;
-end
+porcentajeCurvaDecaimiento = 0.01;
 
 %% PARAMETROS FASES 1 A 3 Y AJUSTES
+
+coordExito = [];
+coordFracaso = [];
+anchMax = vecAnch(end);
+altMax = vecAlt(end);
+
 for zPropagar = zConjuntoPropagar
-    for anchura = maxAnchura
-        for altura = maxAltura
+    for anch = vecAnch
+        for alt = vecAlt
             
             % Variable que determina si es un soliton o no
-            solitonDescartado = 0;
-            
-            L = maxAnchura(end);
-            
+            solitonAceptado = 1;
+               
             % Limites inferiores y superiores para los ejes 'x' y 'y'      
-            xLimInf = - anchura / 2;
-            xLimSup = anchura / 2;
+            xLimInf = - anch / 2;
+            xLimSup = anch / 2;
             yLimInf = 0;
-            yLimSup = altura;
+            yLimSup = alt;
             
-            %% FASE 1 - GENERACION
+%% FASE 1 - GENERACION
             % Leer imagen y convertirla a una matriz de escala de grises
-            
             % Dicha matriz va de 0 (negro) a blanco (255)
             matPotencialSoliton = imread(imagenLeer);
             
@@ -87,15 +80,14 @@ for zPropagar = zConjuntoPropagar
             yPosMin =  limpiarExtremos(yPosMin, pixelesLimpiar, posPrimer, posUltima);
             
             % Normalizar el eje 'y' segun los parametros
+            yPosMin = normalize(yPosMin, 'range');
             yPosMin = rescale(yPosMin, yLimInf, yLimSup);
             
-            % Tomar parte significativa de la imagen (no espacio blanco) y extenderla por 3
-            
+            % Tomar parte significativa de la imagen (no espacio blanco) y extenderla por 3          
             % Obtener espacio significativo y generar vectores de ello
             tamSignificativo = posUltima - posPrimer;
             
             % Colocar los puntos significativos en el segundo tercio de la imagen
-            % 
             xPos = linspace(3 * xLimInf, 3 * xLimSup, tamSignificativo * 3);
             
             yPosMinExt = zeros(1, 3 * tamSignificativo);
@@ -132,17 +124,17 @@ for zPropagar = zConjuntoPropagar
             
             % Guardar resultados
             matPotencialSoliton = [xPosReescale; yPosReescale];
-            save matPotencialSoliton.mat matPotencialSoliton;
+            %save matPotencialSoliton.mat matPotencialSoliton;
             
-            %% FASE 2 - GENERACION
+%% FASE 2 - PROPAGACION
             
             % Leer datos 
-            load matPotencialSoliton.mat matPotencialSoliton;
+            %load matPotencialSoliton.mat matPotencialSoliton;
             
             % Calculo de dx y dz que a su vez determina la cantidad de iteraciones
-            dx = L / N;
+            dx = anchMax / N;
             dz =  dx ^ 2 / 4;         
-            numeroIteraciones = zPropagar / dz;
+            numeroIteraciones = (zPropagar / dz);
             
             % Se redondea al multiplo de 100 mas cercano para poder hacer
             % bien el step
@@ -152,7 +144,7 @@ for zPropagar = zConjuntoPropagar
             stepRevisarPropagacion = numeroIteraciones / 100;
             
             % Transformada de Fourier de la K
-            dk = 2 * pi / L;
+            dk = 2 * pi / anchMax;
             k = linspace(-N / 2, N / 2 - 1, N) .* dk;
             kF = (fftshift(k)).^2;
             
@@ -169,8 +161,14 @@ for zPropagar = zConjuntoPropagar
             capaAnterior = zeros(N, 1);  
             
             errorPromedioPerfiles = 0;
-            
-            for it = 1 : numeroIteraciones    
+         
+%% PROPAGACION CICLO
+            for it = 1 : numeroIteraciones 
+                
+                if it == 10
+                    tic;
+                end
+                       
                 % Transformada de Fourier
                 % Transformada de Fourier por la exp(-i k^2 deltaZ)
                 %Transformada inversa de Fourier
@@ -194,52 +192,96 @@ for zPropagar = zConjuntoPropagar
                                    
                     sumCapaAnterior = sum(capaAnterior);
                     sumCapaActual = sum(capaActual);
-                    errorPromedioPerfiles = abs(1 - (sumCapaAnterior / sumCapaActual));
+                    errorPromedioPerfiles = abs(sumCapaAnterior - sumCapaActual);
                               
                     % En el caso de que no se quiera propagar siempre y que haya mucho
                     % error, se cancela la operacion
-                    if  (errorPromedioPerfiles > 0.15)
-                        solitonDescartado = 1;
+                    if  (errorPromedioPerfiles > 1e-2)
+                        solitonAceptado = 0;
                         
                         if siemprePropagar == 0
                             it = numeroIteraciones;
                         end                   
                     end
                     
+                    if mostrarSoliton == 1
+                        % PLOT SOLITON
+                        figure(1);  
+                        plot(xPosReescale, matCapas(:, numCapa));
+                        xlim([(-vecAnch(end) / 2)*3 (vecAnch(end) / 2)*3]);
+                        ylim([0 vecAlt(end)]);
+                        etiqueta = ['a = ', num2str(anch), ' b = ', num2str(alt), ' z = ', num2str(zPropagar)];
+                        title(etiqueta);                
+                    end
+                      
                     capaAnterior = capaActual;
-                    numCapa = numCapa + 1;
-                                                                  
+                    numCapa = numCapa + 1;      
                 end % Termina step de revision
                 
+                if it == 10
+                    tiempo = toc;
+                   
+                    msjTiempo1 = ['TxI (seg): ', num2str(tiempo), ' - ITot: ', num2str(numeroIteraciones)];
+                    tResSeg = (tiempo * numeroIteraciones);
+                    tResMin = round(tResSeg / 60);
+                    msjTiempo2 = ['TRes (seg): ', num2str(tResSeg), ' - TRes (min): ', num2str(tResMin)];
+                    
+                    disp(msjTiempo1);
+                    disp(msjTiempo2);
+                end
+               
             end % Termina iteracion
-            
-            if mostrarImagen == 1              
-                if solitonDescartado == 0
-                    nombreImg = ['CONFIRMADO_a_', num2str(anchura),'_b_', num2str(altura), num2str(zPropagar), '.png'];
-                    colorPlot = 'Blue';
+  
+%% SE AGREGA A LA LISTA DE EXITOS O FRACASOS
+            paramSoliton = [anch; alt];
+ 
+            if solitonAceptado == 1
+                coordExito = [coordExito, paramSoliton];
+            else
+                coordFracaso = [coordFracaso, paramSoliton];
+            end
+
+            if mostrarSoliton == 1              
+                if solitonAceptado == 1
+                    nombreImg = ['CONFIRMADO_anch_', num2str(anch),'_alt_', num2str(alt), num2str(zPropagar), '.png'];
                 else
-                    nombreImg = ['DESCARTADO_a_', num2str(anchura),'_b_', num2str(altura), num2str(zPropagar), '.png'];
-                    colorPlot = 'Red';
+                    nombreImg = ['DESCARTADO_anch_', num2str(anch),'_alt_', num2str(alt), num2str(zPropagar), '.png'];
                 end
-                 
-                % PLOT SOLITON
-                figure(2);  
-                plot(xPos, yPosMinExt, 'Color', colorPlot);
-                xlim([(-maxAnchura(end) / 2) (maxAnchura(end) / 2)]);
-                ylim([0 maxAltura(end)]);
-                etiqueta = ['a = ', num2str(anchura), ' b = ', num2str(altura), ' z = ', num2str(zPropagar)];
-                title(etiqueta);      
-                hold on;
-                
-                % PLOT MALLA
-                             
-                if guardarImagen == 1
-                    saveas(gcf, nombreImg);  
-                end
-            end % Termina mostrar imagen
-                            
+            end % Termina mostrar imagen           
         end % Termina cambio altura
     end % Termina cambio anchura
+             
+    % Guardar soliton si se quiere, seria la capa 100
+    if guardarImagenSoliton == 1
+        saveas(gcf, nombreImg);  
+    end
+    
+%% PLOT MALLA, No es opcional
+    clf;
+    figure(1);
+    
+    if ~isempty(coordExito)
+        scatter(coordExito(1, :), coordExito(2, :), 'MarkerFaceColor', 'Blue');
+        hold on;
+    end
+    
+    if ~isempty(coordFracaso)
+        scatter(coordFracaso(1, :), coordFracaso(2, :), 'MarkerFaceColor', 'Red');
+        hold on;
+    end
+    
+    xlim([vecAnch(1) vecAnch(end)]);
+    ylim([vecAlt(1) vecAlt(end)]);
+    xlabel('Anchura');
+    ylabel('Altura');
+    etiqueta = [' z = ', num2str(zPropagar)];
+    title(etiqueta); 
+    grid on;
+    
+    if guardarImagenMalla == 1
+        saveas(gcf, "resultadosMalla.png");  
+    end
+   
 end % Termina cambio z
 
 % Guardar datos de la variable matCapas en el archivo matDatos.mat
@@ -248,16 +290,17 @@ save matSolitonGenerado.mat matCapas;
 %% FASE 3 - GRAFICACION
 
 % Graficar cada una de las capas
-if mostrarAnimacion == 1
+if mostrarAnimacionSoliton == 1
     % Cargar datos
-    load matSolitonGenerado.mat matCapas;
+    %load matSolitonGenerado.mat matCapas;
 
     for i = 1 : 100
-        plot(xPos, matCapas(:, i));
-        xlim([(-maxAnchura(end) / 2) (maxAnchura(end) / 2)]);
-        ylim([0 maxAltura(end)]);
+        figure(1);  
+        plot(xPosReescale, matCapas(:, i));
+        xlim([(-vecAnch(end)/2)*3 (vecAnch(end) / 2)*3]);
+        ylim([0 vecAlt(end)]);
+        title(etiqueta); 
         
-        title("Propagacion de un soliton");
         pause(0.05);
     end
 end
