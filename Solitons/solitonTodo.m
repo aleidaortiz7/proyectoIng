@@ -1,199 +1,252 @@
 clc;
 close all;
 clear all;
-
-%% FASE 1 - GENERACION
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PARAMETROS
 imagenLeer = "mSimetrica.png";
 
-% Limites inferiores y superiores para los ejes 'x' y 'y'
-xLimInf = -0.5;
-xLimSup = 0.5;
-yLimInf = 0;
-yLimSup = 1.0;
+%% PARAMETROS GENERALES (GENERACION DE TODOS LOS CASOS)
+generacionAutomatica = 1;
+siemprePropagar = 1;
+
+mostrarImagen = 1;
+guardarImagen = 0;
+mostrarAnimacion = 0;
+
+maxAnchura = 1:10;
+maxAltura = 1:10;
+zConjuntoPropagar = [10 25 100];
 
 % Cantidad de puntos
-N = 1000;
+N = 500;
 
 % Porcentajes de limpieza y curva de decaimiento. Es decir, 
 % cuantos porcentaje de pixeles se toman de cada extremo para
 % limpiar y para generar una curva de decaimiento.
-porcentajeLimpiaExtremos = 0.05;
-porcentajeCurvaDecaimiento = 0.01;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% Leer imagen y convertirla a una matriz de escala de grises
-
-% Dicha matriz va de 0 (negro) a blanco (255)
-matPotencialSoliton = imread(imagenLeer);
-
-% En el caso de que la matriz sea a color, tiene 3 dimensiones,
-% por lo que se necesita usar el comando rgb2gray para extrar
-% solo las dimensiones del blanco y negro
-dimColoresImagen = ndims(matPotencialSoliton);
-if dimColoresImagen == 3
-  matPotencialSoliton = rgb2gray(matPotencialSoliton); 
-end
-
-%% Interpretar la matriz de escalas de grises como un vector de valores 'y'
-
-% Usar el comando flipud para obtener los valores minimos a partir de 
-% la esquina inferior izquierda. De lo contrario, se regresan los min
-% empezando desde la esquina superior izquierda.
-matPotencialSoliton = flipud(matPotencialSoliton);
-
-% Obtener las intensidades minimas y sus posiciones en el eje 'y' para cada
-% columna de la matriz de grises. Filtrar valores que no sean parecidos al negro (0)
-[intensidadesMinimas, yPosMin] = min(matPotencialSoliton);
-yPosMin(intensidadesMinimas >= 10) = 0;
-
-% Encontrar primer y ultima posicion que sean parte del dibujo
-posPrimer = find(yPosMin, 1);
-posUltima = find(yPosMin, 1, 'last');
-
-% Para cada extremo, limpiar un porcentaje de la imagen
-% En el caso del lado izquierdo, se mandan en orden inverso para poder usar
-% la misma funcion sin hacerle muchos cambios. Al final se invierten
-pixelesLimpiar = round((posUltima - posPrimer + 1) * porcentajeLimpiaExtremos);
-yPosMin =  limpiarExtremos(yPosMin, pixelesLimpiar, posPrimer, posUltima);
-
-%% Normalizar el eje 'y' segun los parametros
-yPosMin = rescale(yPosMin, yLimInf, yLimSup);
-
-%% Tomar parte significativa de la imagen (no espacio blanco) y extenderla por 3
-
-% Obtener espacio significativo y generar vectores de ello
-tamSignificativo = posUltima - posPrimer;
-
-% Colocar los puntos significativos en el segundo tercio de la imagen
-xPos = linspace(xLimInf, xLimSup, tamSignificativo * 3);
-
-yPosMinExt = zeros(1, 3 * tamSignificativo);
-yPosMinExt(tamSignificativo : 2 * tamSignificativo) = yPosMin(posPrimer : posUltima);
-
-%% Crear curva de decaimiento para los extremos de la parte significativa
-% Recalcular primer y ultimo valor diferentes a 0
-posPrimer = find(yPosMinExt, 1);
-posUltima = find(yPosMinExt, 1, 'last');
-
-% Tamano de los espacios en ambos lados
-espacioIzq = posPrimer;
-espacioDer = size(yPosMinExt, 2) - posUltima + 1;
-pixelesDecaer = round((posUltima - posPrimer + 1) * porcentajeCurvaDecaimiento);
-
-% Se crean las lineas de decaimiento para cada uno de los lados
-valorDecae = yPosMinExt(posUltima - pixelesDecaer);
-lambda = - log(yPosMinExt(posUltima) / yPosMinExt(posUltima - pixelesDecaer));
-
-curvaDecaimientoDer = valorDecae * exp(- lambda .* (0:(espacioDer - 1)));
-curvaDecaimientoIzq = fliplr(curvaDecaimientoDer);
-
-% Se insertan las curvas en el vector de Y
-yPosMinExt(pixelesDecaer : pixelesDecaer + size(curvaDecaimientoIzq, 2) - 1) = curvaDecaimientoIzq; 
-yPosMinExt((posUltima - pixelesDecaer) : (posUltima - pixelesDecaer) + size(curvaDecaimientoDer, 2) - 1) = curvaDecaimientoDer;  
-
-%% Reescalamiento y graficación 
-xLinSpace = linspace(xLimInf, xLimSup, N);
-
-% Se interpolan los puntos para que la imagen leida tenga los mismo puntos
-% que el codigo elaborado para generar y propagar
-yPosMinInterpolado = interp1(xPos, yPosMinExt, xLinSpace);
-yPosMinInterpolado(isnan(yPosMinInterpolado)) = 0;
-
-figure(1);
-plot(xLinSpace, yPosMinInterpolado);
-
-%% Guardar resultados
-matPotencialSoliton = [xLinSpace; yPosMinInterpolado];
-save matPotencialSoliton.mat matPotencialSoliton;
-
-%% FASE 2 - GENERACION
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PARAMETROS
-numeroIteraciones = 500;
-stepRevisarPropagacion = 25;
-
-zPropagar = 10;
-siemprePropagar = 0;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% Leer datos 
-load matPotencialSoliton.mat matPotencialSoliton;
-
-% Transformada de Fourier de la K
-L = 20;
-dx = L / N;
-dz =  dx ^ 2 / 4;
-
-dk = 2 * pi / L;
-k = linspace(-N / 2, N / 2 - 1, N) .* dk;
-kF = (fftshift(k)).^2;
-
-%% Entrada 
-
-% Funcion del optical field de una imagen
-U = matPotencialSoliton(2, :);
-
-% Calcular la expresion de voltaje  
-lambda = ones(1, N);
-V = lambda - abs(U) .^ 2 - (1 / 2) * ifft((1i)^2 * kF.* fft(U)) ./ (U + 1e-9);
-
-matCapas = zeros(N, numeroIteraciones);
-errorPromedioPerfiles = 0;
-
-for it = 1 : numeroIteraciones    
-    % Transformada de Fourier
-    % Transformada de Fourier por la exp(-i k^2 deltaZ)
-    %Transformada inversa de Fourier
-    TF = fft(U);
-    TFExp = exp(-1i .* kF .* dz / 4) .* TF;
-    TFExpInv = ifft(TFExp);
-
-    % Calcular funcion phi y almacenar el resultado
-    U = exp(1i .* dz / 2 .* (abs(TFExpInv) .^ 2 + V)) .* TFExpInv;
-    matCapas(:, it) = abs(U);
+porcentajeCurvaDecaimiento = 0.05;
     
-    % Cada ciertas iteraciones, revisar el error entre la iteracion actual
-    % y una previa. Si es mucho el error, quiere decir que no es soliton
-    if mod(it, stepRevisarPropagacion) == 0
-        sumError = sum(abs(matCapas(:, it) - matCapas(:, it - stepRevisarPropagacion + 1)));
-        errorPromedioPerfiles = sumError / N;
-        
-        % En el caso de que no se quiera propagar siempre y que haya mucho
-        % error, se cancela la operacion
-        if (siemprePropagar == 0) && (errorPromedioPerfiles > 1e-3)
-            disp('No es un soliton, cancelando propagacion');
-            break;
-        end
-    end
+%% PARAMETROS PARTICULARES (GENERACION DE SOLO UN CASO)
+anchuraParticular = [10];
+alturaParticular = [10];
+zParticular = [10];
+
+if generacionAutomatica == 0
+    maxAnchura = anchuraParticular;
+    maxAltura = alturaParticular;
+    zConjuntoPropagar = zParticular;
 end
+
+%% PARAMETROS FASES 1 A 3 Y AJUSTES
+for zPropagar = zConjuntoPropagar
+    for anchura = maxAnchura
+        for altura = maxAltura
+            
+            % Variable que determina si es un soliton o no
+            solitonDescartado = 0;
+            
+            L = maxAnchura(end);
+            
+            % Limites inferiores y superiores para los ejes 'x' y 'y'      
+            xLimInf = - anchura / 2;
+            xLimSup = anchura / 2;
+            yLimInf = 0;
+            yLimSup = altura;
+            
+            %% FASE 1 - GENERACION
+            % Leer imagen y convertirla a una matriz de escala de grises
+            
+            % Dicha matriz va de 0 (negro) a blanco (255)
+            matPotencialSoliton = imread(imagenLeer);
+            
+            % En el caso de que la matriz sea a color, tiene 3 dimensiones,
+            % por lo que se necesita usar el comando rgb2gray para extrar
+            % solo las dimensiones del blanco y negro
+            dimColoresImagen = ndims(matPotencialSoliton);
+            if dimColoresImagen == 3
+              matPotencialSoliton = rgb2gray(matPotencialSoliton); 
+            end
+            
+            % Interpretar la matriz de escalas de grises como un vector de valores 'y'
+            
+            % Usar el comando flipud para obtener los valores minimos a partir de 
+            % la esquina inferior izquierda. De lo contrario, se regresan los min
+            % empezando desde la esquina superior izquierda.
+            matPotencialSoliton = flipud(matPotencialSoliton);
+            
+            % Obtener las intensidades minimas y sus posiciones en el eje 'y' para cada
+            % columna de la matriz de grises. Filtrar valores que no sean parecidos al negro (0)
+            [intensidadesMinimas, yPosMin] = min(matPotencialSoliton);
+            yPosMin(intensidadesMinimas >= 10) = 0;
+            
+            % Encontrar primer y ultima posicion que sean parte del dibujo
+            posPrimer = find(yPosMin, 1);
+            posUltima = find(yPosMin, 1, 'last');
+            
+            % Para cada extremo, limpiar un porcentaje de la imagen
+            % En el caso del lado izquierdo, se mandan en orden inverso para poder usar
+            % la misma funcion sin hacerle muchos cambios. Al final se invierten
+            pixelesLimpiar = round((posUltima - posPrimer + 1) * porcentajeCurvaDecaimiento);
+            yPosMin =  limpiarExtremos(yPosMin, pixelesLimpiar, posPrimer, posUltima);
+            
+            % Normalizar el eje 'y' segun los parametros
+            yPosMin = rescale(yPosMin, yLimInf, yLimSup);
+            
+            % Tomar parte significativa de la imagen (no espacio blanco) y extenderla por 3
+            
+            % Obtener espacio significativo y generar vectores de ello
+            tamSignificativo = posUltima - posPrimer;
+            
+            % Colocar los puntos significativos en el segundo tercio de la imagen
+            % 
+            xPos = linspace(3 * xLimInf, 3 * xLimSup, tamSignificativo * 3);
+            
+            yPosMinExt = zeros(1, 3 * tamSignificativo);
+            yPosMinExt(tamSignificativo : 2 * tamSignificativo) = yPosMin(posPrimer : posUltima);
+            
+            % Crear curva de decaimiento para los extremos de la parte significativa
+            % Recalcular primer y ultimo valor diferentes a 0
+            posPrimer = find(yPosMinExt, 1);
+            posUltima = find(yPosMinExt, 1, 'last');
+            
+            % Tamano de los espacios en ambos lados
+            espacioIzq = posPrimer;
+            espacioDer = size(yPosMinExt, 2) - posUltima + 1;
+            pixelesDecaer = round((posUltima - posPrimer + 1) * porcentajeCurvaDecaimiento);
+            
+            % Se crean las lineas de decaimiento para cada uno de los lados
+            valorDecae = yPosMinExt(posUltima - pixelesDecaer);
+            lambda = - log(yPosMinExt(posUltima) / yPosMinExt(posUltima - pixelesDecaer));
+            
+            curvaDecaimientoDer = valorDecae * exp(- lambda .* (0:(espacioDer - 1)));
+            curvaDecaimientoIzq = fliplr(curvaDecaimientoDer);
+            
+            % Se insertan las curvas en el vector de Y
+            yPosMinExt(pixelesDecaer : pixelesDecaer + size(curvaDecaimientoIzq, 2) - 1) = curvaDecaimientoIzq; 
+            yPosMinExt((posUltima - pixelesDecaer) : (posUltima - pixelesDecaer) + size(curvaDecaimientoDer, 2) - 1) = curvaDecaimientoDer;  
+            
+            % Reescalamiento y graficación 
+            xPosReescale = linspace(3 * xLimInf, 3 * xLimSup, N);
+            
+            % Se interpolan los puntos para que la imagen leida tenga los mismo puntos
+            % que el codigo elaborado para generar y propagar
+            yPosReescale = interp1(xPos, yPosMinExt, xPosReescale);
+            yPosReescale(isnan(yPosReescale)) = 0;
+            
+            % Guardar resultados
+            matPotencialSoliton = [xPosReescale; yPosReescale];
+            save matPotencialSoliton.mat matPotencialSoliton;
+            
+            %% FASE 2 - GENERACION
+            
+            % Leer datos 
+            load matPotencialSoliton.mat matPotencialSoliton;
+            
+            % Calculo de dx y dz que a su vez determina la cantidad de iteraciones
+            dx = L / N;
+            dz =  dx ^ 2 / 4;         
+            numeroIteraciones = zPropagar / dz;
+            
+            % Se redondea al multiplo de 100 mas cercano para poder hacer
+            % bien el step
+            numeroIteraciones = ceil(numeroIteraciones / 100) * 100;
+            
+            % Step de tal forma que siempre haya 100 capas
+            stepRevisarPropagacion = numeroIteraciones / 100;
+            
+            % Transformada de Fourier de la K
+            dk = 2 * pi / L;
+            k = linspace(-N / 2, N / 2 - 1, N) .* dk;
+            kF = (fftshift(k)).^2;
+            
+            % Funcion del optical field de una imagen
+            U = matPotencialSoliton(2, :);
+            
+            % Calcular la expresion de voltaje  
+            lambda = ones(1, N);
+            V = lambda - abs(U) .^ 2 - (1 / 2) * ifft((1i)^2 * kF.* fft(U)) ./ (U + 1e-9);
+                   
+            errorPromedioPerfiles = 0;
+            matCapas = zeros(N, numeroIteraciones);
+            numCapa = 1;
+            
+            for it = 1 : numeroIteraciones    
+                % Transformada de Fourier
+                % Transformada de Fourier por la exp(-i k^2 deltaZ)
+                %Transformada inversa de Fourier
+                TF = fft(U);
+                TFExp = exp(-1i .* kF .* dz / 4) .* TF;
+                TFExpInv = ifft(TFExp);
+            
+                % Calcular funcion phi y almacenar el resultado
+                U = exp(1i .* dz / 2 .* (abs(TFExpInv) .^ 2 + V)) .* TFExpInv;
+                matCapas(:, it) = abs(U);
+            
+                % Cada ciertas iteraciones, revisar el error entre la iteracion actual
+                % y una previa. Si es mucho el error, quiere decir que no es soliton
+                if mod(it, stepRevisarPropagacion) == 0
+                                      
+                    capaActual = sum(matCapas(:, it));
+                    capaAnterior = sum(matCapas(:, it - stepRevisarPropagacion + 1));                 
+                    errorPromedioPerfiles = abs(1 - (capaActual / capaAnterior));
+                 
+                    % En el caso de que no se quiera propagar siempre y que haya mucho
+                    % error, se cancela la operacion
+                    if  (errorPromedioPerfiles > 0.1)
+                        solitonDescartado = 1;
+                        it = numeroIteraciones;
+                    end     
+                                                                  
+                end % Termina step de revision
+                
+            end % Termina iteracion
+            
+            if mostrarImagen == 1              
+                if solitonDescartado == 0
+                    nombreImg = ['CONFIRMADO_a_', num2str(anchura),'_b_', num2str(altura), num2str(zPropagar), '.png'];
+                    colorPlot = 'Blue';
+                else
+                    nombreImg = ['DESCARTADO_a_', num2str(anchura),'_b_', num2str(altura), num2str(zPropagar), '.png'];
+                    colorPlot = 'Red';
+                end
+                 
+                figure(2);  
+                plot(xPos, yPosMinExt, 'Color', colorPlot);
+                xlim([(-maxAnchura(end) / 2) (maxAnchura(end) / 2)]);
+                ylim([0 maxAltura(end)]);
+                etiqueta = ['a = ', num2str(anchura), ' b = ', num2str(altura), ' z = ', num2str(zPropagar)];
+                title(etiqueta);
+                            
+                hold on;
+                             
+                if guardarImagen == 1
+                    saveas(gcf, nombreImg);  
+                end
+            end % Termina mostrar imagen
+                            
+        end % Termina cambio altura
+    end % Termina cambio anchura
+end % Termina cambio z
 
 % Guardar datos de la variable matCapas en el archivo matDatos.mat
 save matSolitonGenerado.mat matCapas;
 
 %% FASE 3 - GRAFICACION
 
-% Cargar datos
-load matSolitonGenerado.mat matCapas;
-
-% Encontrar maximos valores
-maxAll = max(matCapas, [], 'all');
-
 % Graficar cada una de las capas
-for i = 1 : numeroIteraciones
-    figure(2);
-    plot(xLinSpace, matCapas(:, i));
-    ylim([0 maxAll]);
-    
-    title("Propagacion de un soliton");
-    pause(0.01);
+if mostrarAnimacion == 1
+    % Cargar datos
+    load matSolitonGenerado.mat matCapas;
+
+    for i = 1 : 100
+        plot(xPos, matCapas(:, i));
+        xlim([(-maxAnchura(end) / 2) (maxAnchura(end) / 2)]);
+        ylim([0 maxAltura(end)]);
+        
+        title("Propagacion de un soliton");
+        pause(0.05);
+    end
 end
 
-%% Limpiar los datos para que solo sigan una direccion
+%% FUNCIONES AUXILIARES
+% Limpiar los datos para que solo sigan una direccion
 function yValue = limpiarExtremos(yValue, cantidadPixeles, posPrimer, posUltima)
     extremoIzq = flip(yValue(posPrimer : posPrimer + cantidadPixeles - 1));
     extremoDer = yValue(posUltima - cantidadPixeles - 1: posUltima);
